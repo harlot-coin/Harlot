@@ -6,10 +6,10 @@
 #include "rocksdb/status.h"
 #include "rocksdb/env.h"
 
-#include <fcntl.h>
 #include <vector>
-#include "test_util/testharness.h"
+#include <fcntl.h>
 #include "util/coding.h"
+#include "util/testharness.h"
 
 namespace rocksdb {
 
@@ -25,7 +25,8 @@ class LockTest : public testing::Test {
     current_ = this;
   }
 
-  ~LockTest() override {}
+  ~LockTest() {
+  }
 
   Status LockFile(FileLock** db_lock) {
     return env_->LockFile(file_, db_lock);

@@ -22,21 +22,24 @@ class BlobIndexCompactionFilter : public CompactionFilter {
         current_time_(current_time),
         statistics_(statistics) {}
 
-  ~BlobIndexCompactionFilter() override {
+  virtual ~BlobIndexCompactionFilter() {
     RecordTick(statistics_, BLOB_DB_BLOB_INDEX_EXPIRED_COUNT, expired_count_);
     RecordTick(statistics_, BLOB_DB_BLOB_INDEX_EXPIRED_SIZE, expired_size_);
     RecordTick(statistics_, BLOB_DB_BLOB_INDEX_EVICTED_COUNT, evicted_count_);
     RecordTick(statistics_, BLOB_DB_BLOB_INDEX_EVICTED_SIZE, evicted_size_);
   }
 
-  const char* Name() const override { return "BlobIndexCompactionFilter"; }
+  virtual const char* Name() const override {
+    return "BlobIndexCompactionFilter";
+  }
 
   // Filter expired blob indexes regardless of snapshots.
-  bool IgnoreSnapshots() const override { return true; }
+  virtual bool IgnoreSnapshots() const override { return true; }
 
-  Decision FilterV2(int /*level*/, const Slice& key, ValueType value_type,
-                    const Slice& value, std::string* /*new_value*/,
-                    std::string* /*skip_until*/) const override {
+  virtual Decision FilterV2(int /*level*/, const Slice& key,
+                            ValueType value_type, const Slice& value,
+                            std::string* /*new_value*/,
+                            std::string* /*skip_until*/) const override {
     if (value_type != kBlobIndex) {
       return Decision::kKeep;
     }

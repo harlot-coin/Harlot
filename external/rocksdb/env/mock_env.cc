@@ -183,9 +183,9 @@ class MockSequentialFile : public SequentialFile {
     file_->Ref();
   }
 
-  ~MockSequentialFile() override { file_->Unref(); }
+  ~MockSequentialFile() { file_->Unref(); }
 
-  Status Read(size_t n, Slice* result, char* scratch) override {
+  virtual Status Read(size_t n, Slice* result, char* scratch) override {
     Status s = file_->Read(pos_, n, result, scratch);
     if (s.ok()) {
       pos_ += result->size();
@@ -193,7 +193,7 @@ class MockSequentialFile : public SequentialFile {
     return s;
   }
 
-  Status Skip(uint64_t n) override {
+  virtual Status Skip(uint64_t n) override {
     if (pos_ > file_->Size()) {
       return Status::IOError("pos_ > file_->Size()");
     }
@@ -201,7 +201,7 @@ class MockSequentialFile : public SequentialFile {
     if (n > available) {
       n = available;
     }
-    pos_ += static_cast<size_t>(n);
+    pos_ += n;
     return Status::OK();
   }
 
@@ -214,10 +214,10 @@ class MockRandomAccessFile : public RandomAccessFile {
  public:
   explicit MockRandomAccessFile(MemFile* file) : file_(file) { file_->Ref(); }
 
-  ~MockRandomAccessFile() override { file_->Unref(); }
+  ~MockRandomAccessFile() { file_->Unref(); }
 
-  Status Read(uint64_t offset, size_t n, Slice* result,
-              char* scratch) const override {
+  virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                      char* scratch) const override {
     return file_->Read(offset, n, result, scratch);
   }
 
@@ -229,22 +229,22 @@ class MockRandomRWFile : public RandomRWFile {
  public:
   explicit MockRandomRWFile(MemFile* file) : file_(file) { file_->Ref(); }
 
-  ~MockRandomRWFile() override { file_->Unref(); }
+  ~MockRandomRWFile() { file_->Unref(); }
 
-  Status Write(uint64_t offset, const Slice& data) override {
+  virtual Status Write(uint64_t offset, const Slice& data) override {
     return file_->Write(offset, data);
   }
 
-  Status Read(uint64_t offset, size_t n, Slice* result,
-              char* scratch) const override {
+  virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                      char* scratch) const override {
     return file_->Read(offset, n, result, scratch);
   }
 
-  Status Close() override { return file_->Fsync(); }
+  virtual Status Close() override { return file_->Fsync(); }
 
-  Status Flush() override { return Status::OK(); }
+  virtual Status Flush() override { return Status::OK(); }
 
-  Status Sync() override { return file_->Fsync(); }
+  virtual Status Sync() override { return file_->Fsync(); }
 
  private:
   MemFile* file_;
@@ -257,9 +257,9 @@ class MockWritableFile : public WritableFile {
     file_->Ref();
   }
 
-  ~MockWritableFile() override { file_->Unref(); }
+  ~MockWritableFile() { file_->Unref(); }
 
-  Status Append(const Slice& data) override {
+  virtual Status Append(const Slice& data) override {
     size_t bytes_written = 0;
     while (bytes_written < data.size()) {
       auto bytes = RequestToken(data.size() - bytes_written);
@@ -271,17 +271,17 @@ class MockWritableFile : public WritableFile {
     }
     return Status::OK();
   }
-  Status Truncate(uint64_t size) override {
+  virtual Status Truncate(uint64_t size) override {
     file_->Truncate(static_cast<size_t>(size));
     return Status::OK();
   }
-  Status Close() override { return file_->Fsync(); }
+  virtual Status Close() override { return file_->Fsync(); }
 
-  Status Flush() override { return Status::OK(); }
+  virtual Status Flush() override { return Status::OK(); }
 
-  Status Sync() override { return file_->Fsync(); }
+  virtual Status Sync() override { return file_->Fsync(); }
 
-  uint64_t GetFileSize() override { return file_->Size(); }
+  virtual uint64_t GetFileSize() override { return file_->Size(); }
 
  private:
   inline size_t RequestToken(size_t bytes) {
@@ -299,7 +299,7 @@ class MockWritableFile : public WritableFile {
 
 class MockEnvDirectory : public Directory {
  public:
-  Status Fsync() override { return Status::OK(); }
+  virtual Status Fsync() override { return Status::OK(); }
 };
 
 class MockEnvFileLock : public FileLock {
@@ -319,7 +319,7 @@ class TestMemLogger : public Logger {
   static const uint64_t flush_every_seconds_ = 5;
   std::atomic_uint_fast64_t last_flush_micros_;
   Env* env_;
-  std::atomic<bool> flush_pending_;
+  bool flush_pending_;
 
  public:
   TestMemLogger(std::unique_ptr<WritableFile> f, Env* env,
@@ -330,9 +330,9 @@ class TestMemLogger : public Logger {
         last_flush_micros_(0),
         env_(env),
         flush_pending_(false) {}
-  ~TestMemLogger() override {}
+  virtual ~TestMemLogger() {}
 
-  void Flush() override {
+  virtual void Flush() override {
     if (flush_pending_) {
       flush_pending_ = false;
     }
@@ -340,7 +340,7 @@ class TestMemLogger : public Logger {
   }
 
   using Logger::Logv;
-  void Logv(const char* format, va_list ap) override {
+  virtual void Logv(const char* format, va_list ap) override {
     // We try twice: the first time with a fixed-size stack allocated buffer,
     // and the second time with a much larger dynamically allocated buffer.
     char buffer[500];
@@ -424,7 +424,7 @@ MockEnv::~MockEnv() {
 
 // Partial implementation of the Env interface.
 Status MockEnv::NewSequentialFile(const std::string& fname,
-                                  std::unique_ptr<SequentialFile>* result,
+                                  unique_ptr<SequentialFile>* result,
                                   const EnvOptions& /*soptions*/) {
   auto fn = NormalizePath(fname);
   MutexLock lock(&mutex_);
@@ -441,7 +441,7 @@ Status MockEnv::NewSequentialFile(const std::string& fname,
 }
 
 Status MockEnv::NewRandomAccessFile(const std::string& fname,
-                                    std::unique_ptr<RandomAccessFile>* result,
+                                    unique_ptr<RandomAccessFile>* result,
                                     const EnvOptions& /*soptions*/) {
   auto fn = NormalizePath(fname);
   MutexLock lock(&mutex_);
@@ -458,7 +458,7 @@ Status MockEnv::NewRandomAccessFile(const std::string& fname,
 }
 
 Status MockEnv::NewRandomRWFile(const std::string& fname,
-                                std::unique_ptr<RandomRWFile>* result,
+                                unique_ptr<RandomRWFile>* result,
                                 const EnvOptions& /*soptions*/) {
   auto fn = NormalizePath(fname);
   MutexLock lock(&mutex_);
@@ -476,7 +476,7 @@ Status MockEnv::NewRandomRWFile(const std::string& fname,
 
 Status MockEnv::ReuseWritableFile(const std::string& fname,
                                   const std::string& old_fname,
-                                  std::unique_ptr<WritableFile>* result,
+                                  unique_ptr<WritableFile>* result,
                                   const EnvOptions& options) {
   auto s = RenameFile(old_fname, fname);
   if (!s.ok()) {
@@ -487,7 +487,7 @@ Status MockEnv::ReuseWritableFile(const std::string& fname,
 }
 
 Status MockEnv::NewWritableFile(const std::string& fname,
-                                std::unique_ptr<WritableFile>* result,
+                                unique_ptr<WritableFile>* result,
                                 const EnvOptions& env_options) {
   auto fn = NormalizePath(fname);
   MutexLock lock(&mutex_);
@@ -503,7 +503,7 @@ Status MockEnv::NewWritableFile(const std::string& fname,
 }
 
 Status MockEnv::NewDirectory(const std::string& /*name*/,
-                             std::unique_ptr<Directory>* result) {
+                             unique_ptr<Directory>* result) {
   result->reset(new MockEnvDirectory());
   return Status::OK();
 }
@@ -660,7 +660,7 @@ Status MockEnv::LinkFile(const std::string& src, const std::string& dest) {
 }
 
 Status MockEnv::NewLogger(const std::string& fname,
-                          std::shared_ptr<Logger>* result) {
+                          shared_ptr<Logger>* result) {
   auto fn = NormalizePath(fname);
   MutexLock lock(&mutex_);
   auto iter = file_map_.find(fn);

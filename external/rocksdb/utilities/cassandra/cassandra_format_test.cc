@@ -5,7 +5,7 @@
 
 #include <cstring>
 #include <memory>
-#include "test_util/testharness.h"
+#include "util/testharness.h"
 #include "utilities/cassandra/format.h"
 #include "utilities/cassandra/serialize.h"
 #include "utilities/cassandra/test_utils.h"
@@ -125,14 +125,13 @@ TEST(ExpiringColumnTest, ExpiringColumn) {
 TEST(TombstoneTest, TombstoneCollectable) {
   int32_t now = (int32_t)time(nullptr);
   int32_t gc_grace_seconds = 16440;
-  int32_t time_delta_seconds = 10;
   EXPECT_TRUE(Tombstone(ColumnTypeMask::DELETION_MASK, 0,
-                        now - gc_grace_seconds - time_delta_seconds,
-                        ToMicroSeconds(now - gc_grace_seconds - time_delta_seconds))
+                        now - gc_grace_seconds,
+                        ToMicroSeconds(now - gc_grace_seconds))
                   .Collectable(gc_grace_seconds));
   EXPECT_FALSE(Tombstone(ColumnTypeMask::DELETION_MASK, 0,
-                         now - gc_grace_seconds + time_delta_seconds,
-                         ToMicroSeconds(now - gc_grace_seconds + time_delta_seconds))
+                         now - gc_grace_seconds + 1,
+                         ToMicroSeconds(now - gc_grace_seconds + 1))
                    .Collectable(gc_grace_seconds));
 }
 

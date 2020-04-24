@@ -9,7 +9,11 @@
 
 #include "db/wal_manager.h"
 
-#include <cinttypes>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
+#include <inttypes.h>
 #include <algorithm>
 #include <vector>
 #include <memory>
@@ -18,19 +22,18 @@
 #include "db/log_writer.h"
 #include "db/transaction_log_impl.h"
 #include "db/write_batch_internal.h"
-#include "file/file_util.h"
-#include "file/filename.h"
-#include "logging/logging.h"
 #include "port/port.h"
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
 #include "rocksdb/write_batch.h"
-#include "test_util/sync_point.h"
 #include "util/cast_util.h"
 #include "util/coding.h"
 #include "util/file_reader_writer.h"
+#include "util/filename.h"
+#include "util/logging.h"
 #include "util/mutexlock.h"
 #include "util/string_util.h"
+#include "util/sync_point.h"
 
 namespace rocksdb {
 
@@ -187,8 +190,7 @@ void WalManager::PurgeObsoleteWALFiles() {
           continue;
         }
         if (now_seconds - file_m_time > db_options_.wal_ttl_seconds) {
-          s = DeleteDBFile(&db_options_, file_path, archival_dir, false,
-                           /*force_fg=*/!wal_in_db_path_);
+          s = env_->DeleteFile(file_path);
           if (!s.ok()) {
             ROCKS_LOG_WARN(db_options_.info_log, "Can't delete file: %s: %s",
                            file_path.c_str(), s.ToString().c_str());
@@ -214,8 +216,7 @@ void WalManager::PurgeObsoleteWALFiles() {
             log_file_size = std::max(log_file_size, file_size);
             ++log_files_num;
           } else {
-            s = DeleteDBFile(&db_options_, file_path, archival_dir, false,
-                             /*force_fg=*/!wal_in_db_path_);
+            s = env_->DeleteFile(file_path);
             if (!s.ok()) {
               ROCKS_LOG_WARN(db_options_.info_log,
                              "Unable to delete file: %s: %s", file_path.c_str(),
@@ -236,7 +237,7 @@ void WalManager::PurgeObsoleteWALFiles() {
   }
 
   size_t const files_keep_num =
-      static_cast<size_t>(db_options_.wal_size_limit_mb * 1024 * 1024 / log_file_size);
+      db_options_.wal_size_limit_mb * 1024 * 1024 / log_file_size;
   if (log_files_num <= files_keep_num) {
     return;
   }
@@ -254,9 +255,7 @@ void WalManager::PurgeObsoleteWALFiles() {
 
   for (size_t i = 0; i < files_del_num; ++i) {
     std::string const file_path = archived_logs[i]->PathName();
-    s = DeleteDBFile(&db_options_, db_options_.wal_dir + "/" + file_path,
-                     db_options_.wal_dir, false,
-                     /*force_fg=*/!wal_in_db_path_);
+    s = env_->DeleteFile(db_options_.wal_dir + "/" + file_path);
     if (!s.ok()) {
       ROCKS_LOG_WARN(db_options_.info_log, "Unable to delete file: %s: %s",
                      file_path.c_str(), s.ToString().c_str());
@@ -353,7 +352,7 @@ Status WalManager::RetainProbableWalFiles(VectorLogPtr& all_logs,
   // Binary Search. avoid opening all files.
   while (end >= start) {
     int64_t mid = start + (end - start) / 2;  // Avoid overflow.
-    SequenceNumber current_seq_num = all_logs.at(static_cast<size_t>(mid))->StartSequence();
+    SequenceNumber current_seq_num = all_logs.at(mid)->StartSequence();
     if (current_seq_num == target) {
       end = mid;
       break;
@@ -364,7 +363,7 @@ Status WalManager::RetainProbableWalFiles(VectorLogPtr& all_logs,
     }
   }
   // end could be -ve.
-  size_t start_index = static_cast<size_t>(std::max(static_cast<int64_t>(0), end));
+  size_t start_index = std::max(static_cast<int64_t>(0), end);
   // The last wal file is always included
   all_logs.erase(all_logs.begin(), all_logs.begin() + start_index);
   return Status::OK();
@@ -430,7 +429,7 @@ Status WalManager::ReadFirstLine(const std::string& fname,
 
     Status* status;
     bool ignore_error;  // true if db_options_.paranoid_checks==false
-    void Corruption(size_t bytes, const Status& s) override {
+    virtual void Corruption(size_t bytes, const Status& s) override {
       ROCKS_LOG_WARN(info_log, "[WalManager] %s%s: dropping %d bytes; %s",
                      (this->ignore_error ? "(ignoring error) " : ""), fname,
                      static_cast<int>(bytes), s.ToString().c_str());
@@ -444,7 +443,7 @@ Status WalManager::ReadFirstLine(const std::string& fname,
   std::unique_ptr<SequentialFile> file;
   Status status = env_->NewSequentialFile(
       fname, &file, env_->OptimizeForLogRead(env_options_));
-  std::unique_ptr<SequentialFileReader> file_reader(
+  unique_ptr<SequentialFileReader> file_reader(
       new SequentialFileReader(std::move(file), fname));
 
   if (!status.ok()) {
@@ -458,7 +457,7 @@ Status WalManager::ReadFirstLine(const std::string& fname,
   reporter.status = &status;
   reporter.ignore_error = !db_options_.paranoid_checks;
   log::Reader reader(db_options_.info_log, std::move(file_reader), &reporter,
-                     true /*checksum*/, number);
+                     true /*checksum*/, 0 /*initial_offset*/, number);
   std::string scratch;
   Slice record;
 

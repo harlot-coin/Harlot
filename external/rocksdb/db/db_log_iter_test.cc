@@ -23,7 +23,7 @@ class DBTestXactLogIterator : public DBTestBase {
 
   std::unique_ptr<TransactionLogIterator> OpenTransactionLogIter(
       const SequenceNumber seq) {
-    std::unique_ptr<TransactionLogIterator> iter;
+    unique_ptr<TransactionLogIterator> iter;
     Status status = dbfull()->GetUpdatesSince(seq, &iter);
     EXPECT_OK(status);
     EXPECT_TRUE(iter->Valid());
@@ -249,20 +249,22 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorBlobs) {
   auto res = OpenTransactionLogIter(0)->GetBatch();
   struct Handler : public WriteBatch::Handler {
     std::string seen;
-    Status PutCF(uint32_t cf, const Slice& key, const Slice& value) override {
+    virtual Status PutCF(uint32_t cf, const Slice& key,
+                         const Slice& value) override {
       seen += "Put(" + ToString(cf) + ", " + key.ToString() + ", " +
               ToString(value.size()) + ")";
       return Status::OK();
     }
-    Status MergeCF(uint32_t cf, const Slice& key, const Slice& value) override {
+    virtual Status MergeCF(uint32_t cf, const Slice& key,
+                           const Slice& value) override {
       seen += "Merge(" + ToString(cf) + ", " + key.ToString() + ", " +
               ToString(value.size()) + ")";
       return Status::OK();
     }
-    void LogData(const Slice& blob) override {
+    virtual void LogData(const Slice& blob) override {
       seen += "LogData(" + blob.ToString() + ")";
     }
-    Status DeleteCF(uint32_t cf, const Slice& key) override {
+    virtual Status DeleteCF(uint32_t cf, const Slice& key) override {
       seen += "Delete(" + ToString(cf) + ", " + key.ToString() + ")";
       return Status::OK();
     }

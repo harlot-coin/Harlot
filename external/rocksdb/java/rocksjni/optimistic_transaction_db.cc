@@ -22,7 +22,7 @@
  * Signature: (JLjava/lang/String;)J
  */
 jlong Java_org_rocksdb_OptimisticTransactionDB_open__JLjava_lang_String_2(
-    JNIEnv* env, jclass, jlong joptions_handle, jstring jdb_path) {
+    JNIEnv* env, jclass /*jcls*/, jlong joptions_handle, jstring jdb_path) {
   const char* db_path = env->GetStringUTFChars(jdb_path, nullptr);
   if (db_path == nullptr) {
     // exception thrown: OutOfMemoryError
@@ -50,7 +50,7 @@ jlong Java_org_rocksdb_OptimisticTransactionDB_open__JLjava_lang_String_2(
  */
 jlongArray
 Java_org_rocksdb_OptimisticTransactionDB_open__JLjava_lang_String_2_3_3B_3J(
-    JNIEnv* env, jclass, jlong jdb_options_handle, jstring jdb_path,
+    JNIEnv* env, jclass /*jcls*/, jlong jdb_options_handle, jstring jdb_path,
     jobjectArray jcolumn_names, jlongArray jcolumn_options_handles) {
   const char* db_path = env->GetStringUTFChars(jdb_path, nullptr);
   if (db_path == nullptr) {
@@ -152,38 +152,12 @@ Java_org_rocksdb_OptimisticTransactionDB_open__JLjava_lang_String_2_3_3B_3J(
 
 /*
  * Class:     org_rocksdb_OptimisticTransactionDB
- * Method:    disposeInternal
- * Signature: (J)V
- */
-void Java_org_rocksdb_OptimisticTransactionDB_disposeInternal(
-    JNIEnv *, jobject, jlong jhandle) {
-  auto* optimistic_txn_db =
-      reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
-  assert(optimistic_txn_db != nullptr);
-  delete optimistic_txn_db;
-}
-
-/*
- * Class:     org_rocksdb_OptimisticTransactionDB
- * Method:    closeDatabase
- * Signature: (J)V
- */
-void Java_org_rocksdb_OptimisticTransactionDB_closeDatabase(
-    JNIEnv* env, jclass, jlong jhandle) {
-  auto* optimistic_txn_db =
-      reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
-  assert(optimistic_txn_db != nullptr);
-  rocksdb::Status s = optimistic_txn_db->Close();
-  rocksdb::RocksDBExceptionJni::ThrowNew(env, s);
-}
-
-/*
- * Class:     org_rocksdb_OptimisticTransactionDB
  * Method:    beginTransaction
  * Signature: (JJ)J
  */
 jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction__JJ(
-    JNIEnv*, jobject, jlong jhandle, jlong jwrite_options_handle) {
+    JNIEnv* /*env*/, jobject /*jobj*/, jlong jhandle,
+    jlong jwrite_options_handle) {
   auto* optimistic_txn_db =
       reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
   auto* write_options =
@@ -219,8 +193,8 @@ jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction__JJJ(
  * Signature: (JJJ)J
  */
 jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction_1withOld__JJJ(
-    JNIEnv*, jobject, jlong jhandle, jlong jwrite_options_handle,
-    jlong jold_txn_handle) {
+    JNIEnv* /*env*/, jobject /*jobj*/, jlong jhandle,
+    jlong jwrite_options_handle, jlong jold_txn_handle) {
   auto* optimistic_txn_db =
       reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
   auto* write_options =
@@ -244,8 +218,9 @@ jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction_1withOld__JJJ(
  * Signature: (JJJJ)J
  */
 jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction_1withOld__JJJJ(
-    JNIEnv*, jobject, jlong jhandle, jlong jwrite_options_handle,
-    jlong joptimistic_txn_options_handle, jlong jold_txn_handle) {
+    JNIEnv* /*env*/, jobject /*jobj*/, jlong jhandle,
+    jlong jwrite_options_handle, jlong joptimistic_txn_options_handle,
+    jlong jold_txn_handle) {
   auto* optimistic_txn_db =
       reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
   auto* write_options =
@@ -270,9 +245,21 @@ jlong Java_org_rocksdb_OptimisticTransactionDB_beginTransaction_1withOld__JJJJ(
  * Method:    getBaseDB
  * Signature: (J)J
  */
-jlong Java_org_rocksdb_OptimisticTransactionDB_getBaseDB(
-    JNIEnv*, jobject, jlong jhandle) {
+jlong Java_org_rocksdb_OptimisticTransactionDB_getBaseDB(JNIEnv* /*env*/,
+                                                         jobject /*jobj*/,
+                                                         jlong jhandle) {
   auto* optimistic_txn_db =
       reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
   return reinterpret_cast<jlong>(optimistic_txn_db->GetBaseDB());
+}
+
+/*
+ * Class:     org_rocksdb_OptimisticTransactionDB
+ * Method:    disposeInternal
+ * Signature: (J)V
+ */
+void Java_org_rocksdb_OptimisticTransactionDB_disposeInternal(JNIEnv* /*env*/,
+                                                              jobject /*jobj*/,
+                                                              jlong jhandle) {
+  delete reinterpret_cast<rocksdb::OptimisticTransactionDB*>(jhandle);
 }

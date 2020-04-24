@@ -1,4 +1,3 @@
-// Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 package org.rocksdb;
 
 import org.junit.ClassRule;
@@ -28,7 +27,6 @@ public class InfoLogLevelTest {
     try (final RocksDB db =
              RocksDB.open(dbFolder.getRoot().getAbsolutePath())) {
       db.put("key".getBytes(), "value".getBytes());
-      db.flush(new FlushOptions().setWaitForFlush(true));
       assertThat(getLogContentsWithoutHeader()).isNotEmpty();
     }
   }
@@ -95,7 +93,7 @@ public class InfoLogLevelTest {
     int first_non_header = lines.length;
     // Identify the last line of the header
     for (int i = lines.length - 1; i >= 0; --i) {
-      if (lines[i].indexOf("DB pointer") >= 0) {
+      if (lines[i].indexOf("Options.") >= 0 && lines[i].indexOf(':') >= 0) {
         first_non_header = i + 1;
         break;
       }

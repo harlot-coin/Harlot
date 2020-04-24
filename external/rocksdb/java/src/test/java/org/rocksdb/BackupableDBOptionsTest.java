@@ -45,7 +45,7 @@ public class BackupableDBOptionsTest {
       assertThat(backupableDBOptions.backupEnv()).
           isNull();
 
-      try(final Env env = new RocksMemEnv(Env.getDefault())) {
+      try(final Env env = new RocksMemEnv()) {
         backupableDBOptions.setBackupEnv(env);
         assertThat(backupableDBOptions.backupEnv())
             .isEqualTo(env);

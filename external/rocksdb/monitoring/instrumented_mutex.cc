@@ -6,13 +6,13 @@
 #include "monitoring/instrumented_mutex.h"
 #include "monitoring/perf_context_imp.h"
 #include "monitoring/thread_status_util.h"
-#include "test_util/sync_point.h"
+#include "util/sync_point.h"
 
 namespace rocksdb {
 namespace {
 Statistics* stats_for_report(Env* env, Statistics* stats) {
   if (env != nullptr && stats != nullptr &&
-      stats->get_stats_level() > kExceptTimeForMutex) {
+      stats->stats_level_ > kExceptTimeForMutex) {
     return stats;
   } else {
     return nullptr;

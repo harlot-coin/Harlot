@@ -234,35 +234,38 @@ struct CleanupContext {
 };
 
 // A cache shard which maintains its own CLOCK cache.
-class ClockCacheShard final : public CacheShard {
+class ClockCacheShard : public CacheShard {
  public:
   // Hash map type.
   typedef tbb::concurrent_hash_map<CacheKey, CacheHandle*, CacheKey> HashTable;
 
   ClockCacheShard();
-  ~ClockCacheShard() override;
+  ~ClockCacheShard();
 
   // Interfaces
-  void SetCapacity(size_t capacity) override;
-  void SetStrictCapacityLimit(bool strict_capacity_limit) override;
-  Status Insert(const Slice& key, uint32_t hash, void* value, size_t charge,
-                void (*deleter)(const Slice& key, void* value),
-                Cache::Handle** handle, Cache::Priority priority) override;
-  Cache::Handle* Lookup(const Slice& key, uint32_t hash) override;
+  virtual void SetCapacity(size_t capacity) override;
+  virtual void SetStrictCapacityLimit(bool strict_capacity_limit) override;
+  virtual Status Insert(const Slice& key, uint32_t hash, void* value,
+                        size_t charge,
+                        void (*deleter)(const Slice& key, void* value),
+                        Cache::Handle** handle,
+                        Cache::Priority priority) override;
+  virtual Cache::Handle* Lookup(const Slice& key, uint32_t hash) override;
   // If the entry in in cache, increase reference count and return true.
   // Return false otherwise.
   //
   // Not necessary to hold mutex_ before being called.
-  bool Ref(Cache::Handle* handle) override;
-  bool Release(Cache::Handle* handle, bool force_erase = false) override;
-  void Erase(const Slice& key, uint32_t hash) override;
+  virtual bool Ref(Cache::Handle* handle) override;
+  virtual bool Release(Cache::Handle* handle,
+                       bool force_erase = false) override;
+  virtual void Erase(const Slice& key, uint32_t hash) override;
   bool EraseAndConfirm(const Slice& key, uint32_t hash,
                        CleanupContext* context);
-  size_t GetUsage() const override;
-  size_t GetPinnedUsage() const override;
-  void EraseUnRefEntries() override;
-  void ApplyToAllCacheEntries(void (*callback)(void*, size_t),
-                              bool thread_safe) override;
+  virtual size_t GetUsage() const override;
+  virtual size_t GetPinnedUsage() const override;
+  virtual void EraseUnRefEntries() override;
+  virtual void ApplyToAllCacheEntries(void (*callback)(void*, size_t),
+                                      bool thread_safe) override;
 
  private:
   static const uint32_t kInCacheBit = 1;
@@ -672,7 +675,7 @@ void ClockCacheShard::EraseUnRefEntries() {
   Cleanup(context);
 }
 
-class ClockCache final : public ShardedCache {
+class ClockCache : public ShardedCache {
  public:
   ClockCache(size_t capacity, int num_shard_bits, bool strict_capacity_limit)
       : ShardedCache(capacity, num_shard_bits, strict_capacity_limit) {
@@ -682,31 +685,31 @@ class ClockCache final : public ShardedCache {
     SetStrictCapacityLimit(strict_capacity_limit);
   }
 
-  ~ClockCache() override { delete[] shards_; }
+  virtual ~ClockCache() { delete[] shards_; }
 
-  const char* Name() const override { return "ClockCache"; }
+  virtual const char* Name() const override { return "ClockCache"; }
 
-  CacheShard* GetShard(int shard) override {
+  virtual CacheShard* GetShard(int shard) override {
     return reinterpret_cast<CacheShard*>(&shards_[shard]);
   }
 
-  const CacheShard* GetShard(int shard) const override {
+  virtual const CacheShard* GetShard(int shard) const override {
     return reinterpret_cast<CacheShard*>(&shards_[shard]);
   }
 
-  void* Value(Handle* handle) override {
+  virtual void* Value(Handle* handle) override {
     return reinterpret_cast<const CacheHandle*>(handle)->value;
   }
 
-  size_t GetCharge(Handle* handle) const override {
+  virtual size_t GetCharge(Handle* handle) const override {
     return reinterpret_cast<const CacheHandle*>(handle)->charge;
   }
 
-  uint32_t GetHash(Handle* handle) const override {
+  virtual uint32_t GetHash(Handle* handle) const override {
     return reinterpret_cast<const CacheHandle*>(handle)->hash;
   }
 
-  void DisownData() override { shards_ = nullptr; }
+  virtual void DisownData() override { shards_ = nullptr; }
 
  private:
   ClockCacheShard* shards_;

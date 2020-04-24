@@ -17,9 +17,9 @@
 #include "rocksdb/statistics.h"
 #include "table/iterator_wrapper.h"
 #include "table/merging_iterator.h"
-#include "test_util/sync_point.h"
-#include "test_util/testharness.h"
 #include "util/string_util.h"
+#include "util/sync_point.h"
+#include "util/testharness.h"
 #include "utilities/merge_operators.h"
 
 namespace rocksdb {
@@ -116,12 +116,12 @@ class TestIterator : public InternalIterator {
   // Number of operations done on this iterator since construction.
   size_t steps() const { return steps_; }
 
-  bool Valid() const override {
+  virtual bool Valid() const override {
     assert(initialized_);
     return valid_;
   }
 
-  void SeekToFirst() override {
+  virtual void SeekToFirst() override {
     assert(initialized_);
     ++steps_;
     DeleteCurrentIfNeeded();
@@ -129,7 +129,7 @@ class TestIterator : public InternalIterator {
     iter_ = 0;
   }
 
-  void SeekToLast() override {
+  virtual void SeekToLast() override {
     assert(initialized_);
     ++steps_;
     DeleteCurrentIfNeeded();
@@ -137,7 +137,7 @@ class TestIterator : public InternalIterator {
     iter_ = data_.size() - 1;
   }
 
-  void Seek(const Slice& target) override {
+  virtual void Seek(const Slice& target) override {
     assert(initialized_);
     SeekToFirst();
     ++steps_;
@@ -154,13 +154,13 @@ class TestIterator : public InternalIterator {
     }
   }
 
-  void SeekForPrev(const Slice& target) override {
+  virtual void SeekForPrev(const Slice& target) override {
     assert(initialized_);
     DeleteCurrentIfNeeded();
     SeekForPrevImpl(target, &cmp);
   }
 
-  void Next() override {
+  virtual void Next() override {
     assert(initialized_);
     assert(valid_);
     assert(iter_ < data_.size());
@@ -174,7 +174,7 @@ class TestIterator : public InternalIterator {
     valid_ = iter_ < data_.size();
   }
 
-  void Prev() override {
+  virtual void Prev() override {
     assert(initialized_);
     assert(valid_);
     assert(iter_ < data_.size());
@@ -188,23 +188,23 @@ class TestIterator : public InternalIterator {
     }
   }
 
-  Slice key() const override {
+  virtual Slice key() const override {
     assert(initialized_);
     return data_[iter_].first;
   }
 
-  Slice value() const override {
+  virtual Slice value() const override {
     assert(initialized_);
     return data_[iter_].second;
   }
 
-  Status status() const override {
+  virtual Status status() const override {
     assert(initialized_);
     return Status::OK();
   }
 
-  bool IsKeyPinned() const override { return true; }
-  bool IsValuePinned() const override { return true; }
+  virtual bool IsKeyPinned() const override { return true; }
+  virtual bool IsValuePinned() const override { return true; }
 
  private:
   bool initialized_;

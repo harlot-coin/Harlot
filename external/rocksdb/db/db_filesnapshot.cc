@@ -6,20 +6,24 @@
 
 #ifndef ROCKSDB_LITE
 
-#include <cinttypes>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
+#include <inttypes.h>
 #include <stdint.h>
 #include <algorithm>
 #include <string>
-#include "db/db_impl/db_impl.h"
+#include "db/db_impl.h"
 #include "db/job_context.h"
 #include "db/version_set.h"
-#include "file/file_util.h"
-#include "file/filename.h"
 #include "port/port.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
-#include "test_util/sync_point.h"
+#include "util/file_util.h"
+#include "util/filename.h"
 #include "util/mutexlock.h"
+#include "util/sync_point.h"
 
 namespace rocksdb {
 
@@ -40,7 +44,7 @@ Status DBImpl::EnableFileDeletions(bool force) {
   // Job id == 0 means that this is not our background process, but rather
   // user thread
   JobContext job_context(0);
-  bool file_deletion_enabled = false;
+  bool should_purge_files = false;
   {
     InstrumentedMutexLock l(&mutex_);
     if (force) {
@@ -50,20 +54,19 @@ Status DBImpl::EnableFileDeletions(bool force) {
       --disable_delete_obsolete_files_;
     }
     if (disable_delete_obsolete_files_ == 0)  {
-      file_deletion_enabled = true;
+      ROCKS_LOG_INFO(immutable_db_options_.info_log, "File Deletions Enabled");
+      should_purge_files = true;
       FindObsoleteFiles(&job_context, true);
       bg_cv_.SignalAll();
+    } else {
+      ROCKS_LOG_WARN(
+          immutable_db_options_.info_log,
+          "File Deletions Enable, but not really enabled. Counter: %d",
+          disable_delete_obsolete_files_);
     }
   }
-  if (file_deletion_enabled) {
-    ROCKS_LOG_INFO(immutable_db_options_.info_log, "File Deletions Enabled");
-    if (job_context.HaveSomethingToDelete()) {
-      PurgeObsoleteFiles(job_context);
-    }
-  } else {
-    ROCKS_LOG_WARN(immutable_db_options_.info_log,
-                   "File Deletions Enable, but not really enabled. Counter: %d",
-                   disable_delete_obsolete_files_);
+  if (should_purge_files)  {
+    PurgeObsoleteFiles(job_context);
   }
   job_context.Clean();
   LogFlush(immutable_db_options_.info_log);
@@ -84,28 +87,19 @@ Status DBImpl::GetLiveFiles(std::vector<std::string>& ret,
   if (flush_memtable) {
     // flush all dirty data to disk.
     Status status;
-    if (immutable_db_options_.atomic_flush) {
-      autovector<ColumnFamilyData*> cfds;
-      SelectColumnFamiliesForAtomicFlush(&cfds);
+    for (auto cfd : *versions_->GetColumnFamilySet()) {
+      if (cfd->IsDropped()) {
+        continue;
+      }
+      cfd->Ref();
       mutex_.Unlock();
-      status = AtomicFlushMemTables(cfds, FlushOptions(),
-                                    FlushReason::kGetLiveFiles);
+      status = FlushMemTable(cfd, FlushOptions(), FlushReason::kGetLiveFiles);
+      TEST_SYNC_POINT("DBImpl::GetLiveFiles:1");
+      TEST_SYNC_POINT("DBImpl::GetLiveFiles:2");
       mutex_.Lock();
-    } else {
-      for (auto cfd : *versions_->GetColumnFamilySet()) {
-        if (cfd->IsDropped()) {
-          continue;
-        }
-        cfd->Ref();
-        mutex_.Unlock();
-        status = FlushMemTable(cfd, FlushOptions(), FlushReason::kGetLiveFiles);
-        TEST_SYNC_POINT("DBImpl::GetLiveFiles:1");
-        TEST_SYNC_POINT("DBImpl::GetLiveFiles:2");
-        mutex_.Lock();
-        cfd->Unref();
-        if (!status.ok()) {
-          break;
-        }
+      cfd->Unref();
+      if (!status.ok()) {
+        break;
       }
     }
     versions_->GetColumnFamilySet()->FreeDeadColumnFamilies();
@@ -132,7 +126,7 @@ Status DBImpl::GetLiveFiles(std::vector<std::string>& ret,
 
   // create names of the live files. The names are not absolute
   // paths, instead they are relative to dbname_;
-  for (const auto& live_file : live) {
+  for (auto live_file : live) {
     ret.push_back(MakeTableFileName("", live_file.GetNumber()));
   }
 
